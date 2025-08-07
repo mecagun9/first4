@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>거점 전략 게임 - AI 턴 추가</title>
+  <style>
+    body { background-color: #20232a; color: #fff; font-family: sans-serif; margin: 0; padding: 0; }
+    canvas { border: 1px solid #444; display: block; margin: 20px auto; background: #0f1115; }
+    #uiPanel { width: 100%; max-width: 600px; margin: 0 auto; text-align: center; }
+    #info, #turnCounter, #resources { margin: 10px 0; }
+    input[type='number'] { width: 60px; }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas" width="600" height="400"></canvas>
+  <div id="uiPanel">
+    <div id="turnCounter">현재 턴: 1</div>
+    <div id="resources">자원: 100 G</div>
+    <div id="info">출발 거점을 선택하세요.</div>
+    <div id="troopInputPanel" style="display:none;">
+      병력 수: <input type="number" id="troopInput" value="10" min="1" />
+      <button onclick="confirmMove()">이동</button>
+    </div>
+    <button onclick="nextTurn()">다음 턴 ▶</button>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const info = document.getElementById("info");
+    const turnCounter = document.getElementById("turnCounter");
+    const resourceDisplay = document.getElementById("resources");
+    const troopInputPanel = document.getElementById("troopInputPanel");
+    const troopInput = document.getElementById("troopInput");
+
+    const nodes = {
+      A: { name: "A", owner: "player", troops: 30, x: 100, y: 100, connections: ["B", "D"], income: 10 },
+      B: { name: "B", owner: "enemy", troops: 15, x: 250, y: 100, connections: ["A", "C", "E"], income: 5 },
+      C: { name: "C", owner: "neutral", troops: 0, x: 400, y: 100, connections: ["B"], income: 3 },
+      D: { name: "D", owner: "player", troops: 20, x: 100, y: 250, connections: ["A", "E"], income: 8 },
+      E: { name: "E", owner: "enemy", troops: 10, x: 250, y: 250, connections: ["D", "B", "F"], income: 4 },
+      F: { name: "F", owner: "neutral", troops: 0, x: 400, y: 250, connections: ["E"], income: 3 }
+    };
+
+    let movements = [];
+    let selectedNode = null;
+    let targetNode = null;
+    let turn = 1;
+    let resources = 100;
+
+    canvas.addEventListener("mousemove", function (e) {
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      hoveredNode = null;
+      for (const key in nodes) {
+        const node = nodes[key];
+        const dx = mouseX - node.x;
+        const dy = mouseY - node.y;
+        if (dx * dx + dy * dy < 400) {
+          hoveredNode = key;
+          break;
+        }
+      }
+      drawMap();
+    });
+
+    canvas.addEventListener("click", function (e) {
+      if (!hoveredNode) return;
+      if (!selectedNode) {
+        const node = nodes[hoveredNode];
+        if (node.owner === "player" && node.troops > 0) {
+          selectedNode = hoveredNode;
+          info.textContent = `${selectedNode}에서 파견할 거점을 선택하세요.`;
+        }
+      } else {
+        const from = nodes[selectedNode];
+        if (from.connections.includes(hoveredNode) && selectedNode !== hoveredNode) {
+          targetNode = hoveredNode;
+          troopInput.value = Math.floor(from.troops / 2);
+          troopInput.max = from.troops;
+          troopInputPanel.style.display = "block";
+        } else {
+          info.textContent = `잘못된 대상입니다. 다시 선택하세요.`;
+          selectedNode = null;
+        }
+      }
+    });
+
+    function confirmMove() {
+      const from = nodes[selectedNode];
+      const to = nodes[targetNode];
+      const troopsToSend = parseInt(troopInput.value);
+      if (troopsToSend > 0 && troopsToSend <= from.troops) {
+        from.troops -= troopsToSend;
+        movements.push({
+          from: selectedNode,
+          to: targetNode,
+          turnsLeft: 1,
+          troops: troopsToSend,
+          owner: from.owner
+        });
+        info.textContent = `${selectedNode} → ${targetNode} ${troopsToSend}명 이동 명령!`;
+      } else {
+        info.textContent = "병력 수가 잘못되었습니다.";
+      }
+      selectedNode = null;
+      targetNode = null;
+      troopInputPanel.style.display = "none";
+      drawMap();
+    }
+
+    function runAITurn() {
+      const aiBases = Object.entries(nodes).filter(([_, node]) => node.owner === 'enemy' && node.troops > 5);
+      for (const [fromKey, fromNode] of aiBases) {
+        for (const toKey of fromNode.connections) {
+          const toNode = nodes[toKey];
+          if (toNode.owner !== 'enemy') {
+            const sendTroops = Math.floor(fromNode.troops / 2);
+            if (sendTroops > 0) {
+              fromNode.troops -= sendTroops;
+              movements.push({
+                from: fromKey,
+                to: toKey,
+                turnsLeft: 1,
+                troops: sendTroops,
+                owner: 'enemy'
+              });
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    function nextTurn() {
+      turn++;
+      turnCounter.textContent = `현재 턴: ${turn}`;
+
+      for (let i = movements.length - 1; i >= 0; i--) {
+        const move = movements[i];
+        move.turnsLeft--;
+        if (move.turnsLeft <= 0) {
+          const destination = nodes[move.to];
+          if (destination.owner === move.owner) {
+            destination.troops += move.troops;
+          } else {
+            destination.troops -= move.troops;
+            if (destination.troops < 0) {
+              destination.owner = move.owner;
+              destination.troops = Math.abs(destination.troops);
+            }
+          }
+          movements.splice(i, 1);
+        }
+      }
+
+      runAITurn();
+
+      // 수익 계산
+      let income = 0;
+      for (const key in nodes) {
+        if (nodes[key].owner === "player") {
+          income += nodes[key].income;
+        }
+      }
+      resources += income;
+      resourceDisplay.textContent = `자원: ${resources} G`;
+
+      info.textContent = "턴이 진행되었습니다.";
+      drawMap();
+    }
+
+    function drawMap() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      for (const key in nodes) {
+        const node = nodes[key];
+        node.connections.forEach(conn => {
+          const target = nodes[conn];
+          ctx.strokeStyle = "#555";
+          ctx.beginPath();
+          ctx.moveTo(node.x, node.y);
+          ctx.lineTo(target.x, target.y);
+          ctx.stroke();
+        });
+      }
+
+      movements.forEach(move => {
+        const from = nodes[move.from];
+        const to = nodes[move.to];
+        ctx.strokeStyle = "#fff";
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(from.x, from.y);
+        ctx.lineTo(to.x, to.y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      });
+
+      for (const key in nodes) {
+        const node = nodes[key];
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, 20, 0, 2 * Math.PI);
+        ctx.fillStyle =
+          node.owner === "player" ? "#4CAF50" :
+          node.owner === "enemy" ? "#F44336" :
+          "#9E9E9E";
+        ctx.fill();
+        ctx.strokeStyle = "#000";
+        ctx.stroke();
+
+        if (key === hoveredNode) {
+          ctx.strokeStyle = "#FFFF00";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          ctx.lineWidth = 1;
+        }
+
+        ctx.fillStyle = "#fff";
+        ctx.font = "12px Arial";
+        ctx.fillText(`${node.name} (${node.troops})`, node.x - 20, node.y - 30);
+      }
+    }
+
+    let hoveredNode = null;
+    drawMap();
+  </script>
+</body>
+</html>
