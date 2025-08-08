@@ -1,230 +1,480 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <title>거점 전략 게임 - AI 턴 추가</title>
-  <style>
-    body { background-color: #20232a; color: #fff; font-family: sans-serif; margin: 0; padding: 0; }
-    canvas { border: 1px solid #444; display: block; margin: 20px auto; background: #0f1115; }
-    #uiPanel { width: 100%; max-width: 600px; margin: 0 auto; text-align: center; }
-    #info, #turnCounter, #resources { margin: 10px 0; }
-    input[type='number'] { width: 60px; }
-  </style>
+<meta charset="UTF-8" />
+<title>삼국지3 스타일 턴제 + 전투 화면 + 병종/비용</title>
+<style>
+  body{margin:0;background:#1a1d24;color:#eaeaea;font-family:system-ui,apple-system,sans-serif}
+  #wrap{display:flex;gap:12px;padding:12px}
+  #left{flex:0 0 760px}
+  #right{flex:1;display:flex;flex-direction:column;gap:8px}
+  canvas{background:#0f1115;border:1px solid #333;border-radius:8px;display:block}
+  .panel{background:#12151c;border:1px solid #2a2e38;border-radius:8px;padding:10px}
+  h3{margin:0 0 8px 0;font-size:14px;color:#8bd0ff}
+  button{background:#2a3242;border:1px solid #445169;color:#eaeaea;border-radius:6px;padding:8px 10px;cursor:pointer}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .row{display:flex;gap:6px;flex-wrap:wrap}
+  .kv{font-size:12px;opacity:.9}
+  input[type=number]{width:72px;background:#0f1115;color:#fff;border:1px solid #2a2e38;border-radius:6px;padding:6px}
+  small{opacity:.8}
+  .muted{opacity:.7}
+  /* 전투 오버레이 */
+  #battleOverlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.65);z-index:9999}
+  #battleBox{width:820px;background:#0f1115;border:1px solid #2a2e38;border-radius:10px;padding:16px}
+  #battleLog{height:160px;overflow:auto;background:#11151d;border:1px solid #2a2e38;border-radius:8px;padding:8px;font-size:12px}
+  .cols{display:flex;gap:12px}
+  .col{flex:1}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th,td{border:1px solid #2a2e38;padding:4px;text-align:center}
+</style>
 </head>
 <body>
-  <canvas id="gameCanvas" width="600" height="400"></canvas>
-  <div id="uiPanel">
-    <div id="turnCounter">현재 턴: 1</div>
-    <div id="resources">자원: 100 G</div>
-    <div id="info">출발 거점을 선택하세요.</div>
-    <div id="troopInputPanel" style="display:none;">
-      병력 수: <input type="number" id="troopInput" value="10" min="1" />
-      <button onclick="confirmMove()">이동</button>
+<div id="wrap">
+  <div id="left"><canvas id="map" width="760" height="600"></canvas></div>
+  <div id="right">
+    <div class="panel">
+      <h3>턴 / 자원</h3>
+      <div class="kv">현재 턴: <b id="turn">1</b></div>
+      <div class="kv">금: <b id="gold">200</b> G</div>
+      <div class="kv">수입(턴당): <b id="income">0</b> G</div>
+      <div class="kv muted">모집 비용: 보병 1G / 궁수 2G / 기병 3G</div>
     </div>
-    <button onclick="nextTurn()">다음 턴 ▶</button>
+
+    <div class="panel">
+      <h3>거점 정보</h3>
+      <div id="cityInfo" class="kv">거점을 클릭하세요.</div>
+    </div>
+
+    <div class="panel">
+      <h3>명령</h3>
+      <div class="row">
+        <button id="btnMove" disabled>이동</button>
+        <button id="btnRecruit" disabled>모집</button>
+        <button id="btnFortify" disabled>요새화</button>
+        <button id="btnCancel" disabled>취소</button>
+      </div>
+      <div id="cmdArea" style="margin-top:8px;"></div>
+      <div style="margin-top:8px"><button id="btnEnd">턴 종료 ▶</button></div>
+      <small>• 이동: 인접 거점만, 1턴 소요 → 적/중립 도착 시 전투 화면<br>• 모집: 비용 병종별 상이(상단 참고)<br>• 요새화: 10G로 방어 +1 (최대 +5)</small>
+    </div>
+
+    <div class="panel">
+      <h3>로그</h3>
+      <div id="log" style="height:200px;overflow:auto;font-size:12px;line-height:1.4"></div>
+    </div>
   </div>
+</div>
 
-  <script>
-    const canvas = document.getElementById("gameCanvas");
-    const ctx = canvas.getContext("2d");
-    const info = document.getElementById("info");
-    const turnCounter = document.getElementById("turnCounter");
-    const resourceDisplay = document.getElementById("resources");
-    const troopInputPanel = document.getElementById("troopInputPanel");
-    const troopInput = document.getElementById("troopInput");
+<!-- 전투 오버레이 -->
+<div id="battleOverlay">
+  <div id="battleBox">
+    <h3>전투</h3>
+    <div id="battleHeader" class="kv">공격: ? → 방어: ?</div>
 
-    const nodes = {
-      A: { name: "A", owner: "player", troops: 30, x: 100, y: 100, connections: ["B", "D"], income: 10 },
-      B: { name: "B", owner: "enemy", troops: 15, x: 250, y: 100, connections: ["A", "C", "E"], income: 5 },
-      C: { name: "C", owner: "neutral", troops: 0, x: 400, y: 100, connections: ["B"], income: 3 },
-      D: { name: "D", owner: "player", troops: 20, x: 100, y: 250, connections: ["A", "E"], income: 8 },
-      E: { name: "E", owner: "enemy", troops: 10, x: 250, y: 250, connections: ["D", "B", "F"], income: 4 },
-      F: { name: "F", owner: "neutral", troops: 0, x: 400, y: 250, connections: ["E"], income: 3 }
+    <div class="cols" style="margin:10px 0 6px 0">
+      <div class="col">
+        <table>
+          <thead><tr><th colspan="3">공격 병력</th></tr></thead>
+          <tbody>
+            <tr><td>보병</td><td>궁수</td><td>기병</td></tr>
+            <tr><td id="attINF">0</td><td id="attARC">0</td><td id="attCAV">0</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="col">
+        <table>
+          <thead><tr><th colspan="3">수비 병력</th></tr></thead>
+          <tbody>
+            <tr><td>보병</td><td>궁수</td><td>기병</td></tr>
+            <tr><td id="defINF">0</td><td id="defARC">0</td><td id="defCAV">0</td></tr>
+          </tbody>
+        </table>
+        <div class="kv" style="margin-top:6px">방어: <b id="defDefense">0</b></div>
+      </div>
+    </div>
+
+    <div class="row" style="margin-bottom:8px">
+      <button id="btnBattleRound">다음 라운드</button>
+      <button id="btnBattleAuto">자동 전투</button>
+      <button id="btnBattleRetreat">공격 중지(퇴각)</button>
+      <button id="btnBattleFinish" disabled>전투 종료(결과 반영)</button>
+    </div>
+
+    <div id="battleLog"></div>
+  </div>
+</div>
+
+<script>
+/* ===== 병종/비용/상성 ===== */
+const TYPES = ["INF","ARC","CAV"]; // 보병, 궁수, 기병
+const TYPE_NAME = {INF:"보병", ARC:"궁수", CAV:"기병"};
+const TRAIN_COST = {INF:1, ARC:2, CAV:3}; // 모집 비용(1명당)
+const COUNTER = {
+  // a가 b를 상대할 때의 보정(공격 배수)
+  INF: { INF:1.0, ARC:1.25, CAV:0.85 },
+  ARC: { INF:0.9, ARC:1.0,  CAV:1.25 },
+  CAV: { INF:1.25,ARC:0.85, CAV:1.0  },
+};
+
+/* ===== 기본 상수 및 상태 ===== */
+const PLAYER="player", ENEMY="enemy", NEUT="neutral";
+const cities = [
+  // troops를 병종별로 구성
+  {id:"JI", name:"계(계성)", x:120, y:90,  owner:PLAYER, troops:{INF:30,ARC:6,CAV:4}, defense:1, income:12, adj:["YE","BO"]},
+  {id:"YE", name:"업",       x:210, y:120, owner:PLAYER, troops:{INF:20,ARC:6,CAV:4}, defense:1, income:10, adj:["JI","BO","PU"]},
+  {id:"BO", name:"박",       x:170, y:180, owner:NEUT,   troops:{INF:12,ARC:2,CAV:1}, defense:0, income:6,  adj:["JI","YE","PU","CH"]},
+  {id:"PU", name:"부",       x:260, y:190, owner:ENEMY,  troops:{INF:20,ARC:6,CAV:4}, defense:1, income:9,  adj:["YE","BO","CH","LU"]},
+  {id:"CH", name:"허/창",    x:220, y:250, owner:NEUT,   troops:{INF:8, ARC:1,CAV:1}, defense:0, income:6,  adj:["BO","PU","LU","RU"]},
+  {id:"LU", name:"낙양",     x:295, y:255, owner:ENEMY,  troops:{INF:18,ARC:4,CAV:3}, defense:1, income:9,  adj:["PU","CH","RU"]},
+  {id:"RU", name:"여남",     x:260, y:320, owner:NEUT,   troops:{INF:9, ARC:2,CAV:1}, defense:0, income:6,  adj:["CH","LU","SH"]},
+  {id:"SH", name:"수춘",     x:310, y:380, owner:ENEMY,  troops:{INF:16,ARC:4,CAV:2}, defense:1, income:8,  adj:["RU","GU"]},
+  {id:"GU", name:"광릉",     x:360, y:330, owner:NEUT,   troops:{INF:8, ARC:1,CAV:1}, defense:0, income:6,  adj:["SH","QH"]},
+  {id:"QH", name:"건업",     x:420, y:360, owner:ENEMY,  troops:{INF:18,ARC:6,CAV:4}, defense:1, income:10, adj:["GU","HU"]},
+  {id:"HU", name:"회계",     x:520, y:390, owner:NEUT,   troops:{INF:7, ARC:2,CAV:1}, defense:0, income:6,  adj:["QH"]},
+  {id:"PI", name:"북평",     x:140, y:40,  owner:NEUT,   troops:{INF:6, ARC:1,CAV:1}, defense:0, income:5,  adj:["JI"]},
+];
+let turn=1, gold=200;
+let movements=[]; // {from,to,owner,troops:{INF,ARC,CAV},turnsLeft}
+let selectedId=null, mode="idle", moveFrom=null;
+
+const logEl=document.getElementById("log");
+const byId=id=>cities.find(c=>c.id===id);
+const sumTroops=t=>TYPES.reduce((s,k)=>s+(t[k]||0),0);
+function addTroops(a,b){ TYPES.forEach(k=>a[k]=(a[k]||0)+(b[k]||0)); }
+function subTroops(a,b){ TYPES.forEach(k=>a[k]=(a[k]||0)- (b[k]||0)); }
+function cloneTroops(t){ return {INF:t.INF||0, ARC:t.ARC||0, CAV:t.CAV||0}; }
+function isAnyPositive(t){ return TYPES.some(k=>(t[k]||0)>0); }
+
+function log(msg){ const d=document.createElement("div"); d.textContent=msg; logEl.appendChild(d); logEl.scrollTop=logEl.scrollHeight; }
+function incomeOf(owner){ return cities.filter(c=>c.owner===owner).reduce((s,c)=>s+c.income,0); }
+function updateTop(){
+  document.getElementById("turn").textContent=turn;
+  document.getElementById("gold").textContent=gold;
+  document.getElementById("income").textContent=incomeOf(PLAYER);
+}
+function citySummary(c){
+  return `【${c.name}】 ${c.owner===PLAYER?'플레이어':c.owner===ENEMY?'적':'중립'} | 병력:${sumTroops(c.troops)} (보:${c.troops.INF} 궁:${c.troops.ARC} 기:${c.troops.CAV}) | 방어:${c.defense} | 수입:${c.income}`;
+}
+function refreshInfo(){
+  const info=document.getElementById("cityInfo");
+  if(!selectedId){ info.textContent="거점을 클릭하세요."; return; }
+  info.textContent=citySummary(byId(selectedId));
+}
+
+/* ===== 맵 렌더링 ===== */
+const canvas=document.getElementById("map");
+const ctx=canvas.getContext("2d");
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  // 연결선
+  ctx.lineWidth=2;
+  cities.forEach(c=>{
+    c.adj.forEach(a=>{
+      const t=byId(a);
+      ctx.strokeStyle="#2c3647";
+      ctx.beginPath(); ctx.moveTo(c.x,c.y); ctx.lineTo(t.x,t.y); ctx.stroke();
+    });
+  });
+  // 이동 점선
+  movements.forEach(m=>{
+    const s=byId(m.from), t=byId(m.to);
+    ctx.setLineDash([6,6]); ctx.strokeStyle="#bbb";
+    ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(t.x,t.y); ctx.stroke();
+    ctx.setLineDash([]);
+  });
+  // 노드
+  cities.forEach(c=>{
+    ctx.beginPath(); ctx.arc(c.x,c.y,18,0,Math.PI*2);
+    ctx.fillStyle = c.owner===PLAYER?"#3aa76d":c.owner===ENEMY?"#d94a4a":"#777";
+    ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle="#0e0e0e"; ctx.stroke();
+    if(c.id===selectedId){ ctx.beginPath(); ctx.arc(c.x,c.y,22,0,Math.PI*2); ctx.strokeStyle="#ffde6b"; ctx.lineWidth=2; ctx.stroke(); }
+    if(c.defense>0){ ctx.fillStyle="#ffde6b"; ctx.font="12px sans-serif"; ctx.fillText("🛡"+c.defense, c.x-12, c.y+30); }
+    ctx.fillStyle="#eaeaea"; ctx.font="12px sans-serif"; ctx.textAlign="center";
+    ctx.fillText(c.name, c.x, c.y-26);
+    ctx.fillText(`兵:${sumTroops(c.troops)}`, c.x, c.y-10);
+  });
+}
+function cityAt(x,y){
+  return cities.find(c=>{ const dx=x-c.x, dy=y-c.y; return dx*dx+dy*dy<=18*18+8; })?.id||null;
+}
+
+/* ===== 명령 UI ===== */
+const btnMove=document.getElementById("btnMove");
+const btnRecruit=document.getElementById("btnRecruit");
+const btnFortify=document.getElementById("btnFortify");
+const btnCancel=document.getElementById("btnCancel");
+const btnEnd=document.getElementById("btnEnd");
+const cmdArea=document.getElementById("cmdArea");
+
+function setButtons(){
+  const sel=selectedId?byId(selectedId):null;
+  btnMove.disabled=!(sel && sel.owner===PLAYER && sumTroops(sel.troops)>0);
+  btnRecruit.disabled=!(sel && sel.owner===PLAYER);
+  btnFortify.disabled=!(sel && sel.owner===PLAYER && sel.defense<5 && gold>=10);
+  btnCancel.disabled=(mode==="idle");
+}
+btnMove.onclick=()=>{
+  if(!selectedId) return;
+  mode="movePick"; moveFrom=selectedId;
+  cmdArea.innerHTML=`<div class="kv">이동 대상 거점을 클릭하세요. (인접만)</div>`;
+  setButtons();
+};
+btnRecruit.onclick=()=>{
+  if(!selectedId) return;
+  mode="recruit";
+  const c=byId(selectedId);
+  cmdArea.innerHTML=`
+    <div class="kv">모집 수 (비용: 보1G/궁2G/기3G)</div>
+    <div class="row">
+      <div>보병: <input type="number" id="rcINF" min="0" value="0"></div>
+      <div>궁수: <input type="number" id="rcARC" min="0" value="0"></div>
+      <div>기병: <input type="number" id="rcCAV" min="0" value="0"></div>
+      <button id="doRecruit">확인</button>
+    </div>
+  `;
+  document.getElementById("doRecruit").onclick=()=>{
+    const INF=+document.getElementById("rcINF").value||0;
+    const ARC=+document.getElementById("rcARC").value||0;
+    const CAV=+document.getElementById("rcCAV").value||0;
+    const cost=INF*TRAIN_COST.INF + ARC*TRAIN_COST.ARC + CAV*TRAIN_COST.CAV;
+    if(cost>gold){ log(`금이 부족합니다. 필요:${cost}G, 보유:${gold}G`); return; }
+    c.troops.INF+=INF; c.troops.ARC+=ARC; c.troops.CAV+=CAV;
+    gold-=cost;
+    log(`【${c.name}】 모집 완료: 보${INF} 궁${ARC} 기${CAV} (-${cost}G)`);
+    mode="idle"; cmdArea.innerHTML=""; updateTop(); refreshInfo(); draw(); setButtons();
+  };
+  setButtons();
+};
+btnFortify.onclick=()=>{
+  if(!selectedId) return;
+  const c=byId(selectedId);
+  if(c.defense>=5 || gold<10) return;
+  c.defense+=1; gold-=10;
+  log(`【${c.name}】 요새화 +1 (방어 ${c.defense}, 금:${gold})`);
+  refreshInfo(); updateTop(); draw(); setButtons();
+};
+btnCancel.onclick=()=>{ mode="idle"; moveFrom=null; cmdArea.innerHTML=""; setButtons(); };
+btnEnd.onclick=endTurn;
+
+/* 맵 클릭 */
+canvas.addEventListener("click",(e)=>{
+  const rect=canvas.getBoundingClientRect();
+  const x=e.clientX-rect.left, y=e.clientY-rect.top;
+  const hit=cityAt(x,y); if(!hit) return;
+  selectedId=hit; refreshInfo(); setButtons(); draw();
+
+  if(mode==="movePick" && moveFrom){
+    if(moveFrom===hit) return;
+    const from=byId(moveFrom), to=byId(hit);
+    if(!from.adj.includes(to.id)){ log("인접 거점만 이동할 수 있습니다."); return; }
+    if(from.owner!==PLAYER){ log("소유 거점에서만 이동할 수 있습니다."); return; }
+    if(sumTroops(from.troops)<=0){ log("병력이 없습니다."); return; }
+
+    // 병종별 이동 입력
+    mode="idle";
+    cmdArea.innerHTML=`
+      <div class="kv">이동 병력 입력 (최대: 보${from.troops.INF} 궁${from.troops.ARC} 기${from.troops.CAV})</div>
+      <div class="row">
+        <div>보병: <input type="number" id="mvINF" min="0" max="${from.troops.INF}" value="${Math.min(from.troops.INF, Math.floor(from.troops.INF/2))}"></div>
+        <div>궁수: <input type="number" id="mvARC" min="0" max="${from.troops.ARC}" value="${Math.min(from.troops.ARC, Math.floor(from.troops.ARC/2))}"></div>
+        <div>기병: <input type="number" id="mvCAV" min="0" max="${from.troops.CAV}" value="${Math.min(from.troops.CAV, Math.floor(from.troops.CAV/2))}"></div>
+        <button id="doMove">이동</button>
+      </div>
+    `;
+    document.getElementById("doMove").onclick=()=>{
+      const INF=+document.getElementById("mvINF").value||0;
+      const ARC=+document.getElementById("mvARC").value||0;
+      const CAV=+document.getElementById("mvCAV").value||0;
+      if(INF>from.troops.INF||ARC>from.troops.ARC||CAV>from.troops.CAV){ log("병력 초과 입력입니다."); return; }
+      if(INF+ARC+CAV<=0){ log("이동 병력을 입력하세요."); return; }
+      from.troops.INF-=INF; from.troops.ARC-=ARC; from.troops.CAV-=CAV;
+      movements.push({from:from.id,to:to.id,owner:from.owner,troops:{INF,ARC,CAV},turnsLeft:1});
+      log(`행군: ${from.name} → ${to.name} (보${INF} 궁${ARC} 기${CAV})`);
+      cmdArea.innerHTML=""; draw(); refreshInfo(); setButtons();
     };
+    moveFrom=null;
+  }
+});
 
-    let movements = [];
-    let selectedNode = null;
-    let targetNode = null;
-    let turn = 1;
-    let resources = 100;
+/* ===== 전투 오버레이 ===== */
+const battleOverlay=document.getElementById("battleOverlay");
+const battleHeader=document.getElementById("battleHeader");
+const eAttINF=document.getElementById("attINF"), eAttARC=document.getElementById("attARC"), eAttCAV=document.getElementById("attCAV");
+const eDefINF=document.getElementById("defINF"), eDefARC=document.getElementById("defARC"), eDefCAV=document.getElementById("defCAV");
+const eDefDefense=document.getElementById("defDefense");
+const battleLog=document.getElementById("battleLog");
+const btnBattleRound=document.getElementById("btnBattleRound");
+const btnBattleAuto=document.getElementById("btnBattleAuto");
+const btnBattleRetreat=document.getElementById("btnBattleRetreat");
+const btnBattleFinish=document.getElementById("btnBattleFinish");
 
-    canvas.addEventListener("mousemove", function (e) {
-      const rect = canvas.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      hoveredNode = null;
-      for (const key in nodes) {
-        const node = nodes[key];
-        const dx = mouseX - node.x;
-        const dy = mouseY - node.y;
-        if (dx * dx + dy * dy < 400) {
-          hoveredNode = key;
-          break;
-        }
-      }
-      drawMap();
+let battleState=null;
+// {attFrom,attOwner,toId,att:{INF,ARC,CAV},def:{INF,ARC,CAV},defense,finished,retreated}
+
+function openBattle({attFrom, attOwner, toId, att}){
+  const dest=byId(toId);
+  battleState={
+    attFrom, attOwner, toId,
+    att: cloneTroops(att),
+    def: cloneTroops(dest.troops),
+    defense: dest.defense,
+    finished:false, retreated:false
+  };
+  battleLog.innerHTML="";
+  battleHeader.textContent=`공격: ${byId(attFrom).name} (${attOwner}) → 방어: ${dest.name} (${dest.owner})`;
+  syncBattleUI();
+  battleOverlay.style.display="flex";
+}
+function syncBattleUI(){
+  const s=battleState; if(!s) return;
+  eAttINF.textContent=s.att.INF; eAttARC.textContent=s.att.ARC; eAttCAV.textContent=s.att.CAV;
+  eDefINF.textContent=s.def.INF; eDefARC.textContent=s.def.ARC; eDefCAV.textContent=s.def.CAV;
+  eDefDefense.textContent=s.defense;
+  btnBattleFinish.disabled=!s.finished;
+}
+
+function battleRoundOnce(){
+  const s=battleState; if(!s || s.finished) return;
+
+  // 공격측이 병종별로 수비 병종에 가하는 유효 화력 계산
+  // 간단 모델: 각 병종 공격력 = 병력 * (기본 0.18~0.26) * 상성배수
+  const rand = (a,b)=> a + Math.random()*(b-a);
+  let defLoss={INF:0,ARC:0,CAV:0}, attLoss={INF:0,ARC:0,CAV:0};
+
+  // 공격 -> 수비 피해
+  TYPES.forEach(aType=>{
+    const base = s.att[aType];
+    if(base<=0) return;
+    TYPES.forEach(dType=>{
+      const mult = COUNTER[aType][dType];
+      const power = Math.floor(base * rand(0.18,0.26) * mult);
+      defLoss[dType] += power;
     });
+  });
 
-    canvas.addEventListener("click", function (e) {
-      if (!hoveredNode) return;
-      if (!selectedNode) {
-        const node = nodes[hoveredNode];
-        if (node.owner === "player" && node.troops > 0) {
-          selectedNode = hoveredNode;
-          info.textContent = `${selectedNode}에서 파견할 거점을 선택하세요.`;
-        }
-      } else {
-        const from = nodes[selectedNode];
-        if (from.connections.includes(hoveredNode) && selectedNode !== hoveredNode) {
-          targetNode = hoveredNode;
-          troopInput.value = Math.floor(from.troops / 2);
-          troopInput.max = from.troops;
-          troopInputPanel.style.display = "block";
-        } else {
-          info.textContent = `잘못된 대상입니다. 다시 선택하세요.`;
-          selectedNode = null;
-        }
-      }
+  // 수비 -> 공격 반격 (방어 보정: defense가 높을수록 반격 효율 증가 & 피해감소)
+  TYPES.forEach(dType=>{
+    const base = s.def[dType];
+    if(base<=0) return;
+    TYPES.forEach(aType=>{
+      const mult = COUNTER[dType][aType]; // 수비 병종 기준의 상성(그대로 사용)
+      const power = Math.floor(base * rand(0.12,0.20) * mult * (1 + s.defense*0.08));
+      attLoss[aType] += power;
     });
+  });
 
-    function confirmMove() {
-      const from = nodes[selectedNode];
-      const to = nodes[targetNode];
-      const troopsToSend = parseInt(troopInput.value);
-      if (troopsToSend > 0 && troopsToSend <= from.troops) {
-        from.troops -= troopsToSend;
-        movements.push({
-          from: selectedNode,
-          to: targetNode,
-          turnsLeft: 1,
-          troops: troopsToSend,
-          owner: from.owner
-        });
-        info.textContent = `${selectedNode} → ${targetNode} ${troopsToSend}명 이동 명령!`;
-      } else {
-        info.textContent = "병력 수가 잘못되었습니다.";
-      }
-      selectedNode = null;
-      targetNode = null;
-      troopInputPanel.style.display = "none";
-      drawMap();
+  // 방어도에 따른 피해감소(수비 쪽만)
+  TYPES.forEach(t=>{
+    defLoss[t] = Math.max(0, Math.floor(defLoss[t] * (1 - Math.min(0.45, s.defense*0.07))));
+  });
+
+  // 적용
+  TYPES.forEach(t=>{
+    s.def[t] = Math.max(0, s.def[t] - defLoss[t]);
+    s.att[t] = Math.max(0, s.att[t] - attLoss[t]);
+  });
+
+  // 로그
+  const line = `라운드 ▶ 수비피해(보${defLoss.INF} 궁${defLoss.ARC} 기${defLoss.CAV}) / 공격피해(보${attLoss.INF} 궁${attLoss.ARC} 기${attLoss.CAV})
+   → 잔여: 공(보${s.att.INF} 궁${s.att.ARC} 기${s.att.CAV}) / 수(보${s.def.INF} 궁${s.def.ARC} 기${s.def.CAV})`;
+  const d=document.createElement("div"); d.textContent=line; battleLog.appendChild(d); battleLog.scrollTop=battleLog.scrollHeight;
+
+  // 종료 판정
+  if(!isAnyPositive(s.att) || !isAnyPositive(s.def)){ s.finished=true; }
+  syncBattleUI();
+}
+
+btnBattleRound.onclick=battleRoundOnce;
+btnBattleAuto.onclick=()=>{
+  let guard=0; while(battleState && !battleState.finished && guard<64){ battleRoundOnce(); guard++; }
+};
+btnBattleRetreat.onclick=()=>{
+  if(!battleState || battleState.finished) return;
+  battleState.retreated=true; battleState.finished=true;
+  const d=document.createElement("div"); d.innerHTML="<b>퇴각!</b>"; battleLog.appendChild(d); battleLog.scrollTop=battleLog.scrollHeight;
+  syncBattleUI();
+};
+btnBattleFinish.onclick=()=>{
+  const s=battleState; if(!s || !s.finished) return;
+  const dest=byId(s.toId);
+  if(s.retreated){
+    // 남은 공격 병력 귀환
+    if(isAnyPositive(s.att)){ addTroops(byId(s.attFrom).troops, s.att); log(`퇴각: ${byId(s.attFrom).name}로 병력 귀환 (보${s.att.INF} 궁${s.att.ARC} 기${s.att.CAV})`); }
+  }else{
+    const attSum=sumTroops(s.att), defSum=sumTroops(s.def);
+    if(defSum<=0 && attSum>0){
+      dest.owner=s.attOwner;
+      dest.troops=cloneTroops(s.att);
+      dest.defense=Math.max(0, dest.defense-1);
+      log(`함락! ${dest.name} -> ${s.attOwner} (보${s.att.INF} 궁${s.att.ARC} 기${s.att.CAV})`);
+    }else{
+      dest.troops=cloneTroops(s.def);
+      if(attSum>0){ addTroops(byId(s.attFrom).troops, s.att); log(`공격 실패. ${byId(s.attFrom).name}로 병력 귀환 (보${s.att.INF} 궁${s.att.ARC} 기${s.att.CAV})`); }
+      log(`방어 성공: ${dest.name} 잔존 (보${s.def.INF} 궁${s.def.ARC} 기${s.def.CAV})`);
     }
+  }
+  battleOverlay.style.display="none"; battleState=null;
+  draw(); refreshInfo(); updateTop();
+};
 
-    function runAITurn() {
-      const aiBases = Object.entries(nodes).filter(([_, node]) => node.owner === 'enemy' && node.troops > 5);
-      for (const [fromKey, fromNode] of aiBases) {
-        for (const toKey of fromNode.connections) {
-          const toNode = nodes[toKey];
-          if (toNode.owner !== 'enemy') {
-            const sendTroops = Math.floor(fromNode.troops / 2);
-            if (sendTroops > 0) {
-              fromNode.troops -= sendTroops;
-              movements.push({
-                from: fromKey,
-                to: toKey,
-                turnsLeft: 1,
-                troops: sendTroops,
-                owner: 'enemy'
-              });
-              break;
-            }
-          }
-        }
-      }
+/* ===== 이동/전투 연결 ===== */
+function resolveMovementsOrOpenBattles(){
+  const idx=movements.findIndex(m=>m.turnsLeft<=0);
+  if(idx===-1) return false;
+  const m=movements[idx], dest=byId(m.to);
+  if(dest.owner===m.owner){
+    addTroops(dest.troops, m.troops);
+    log(`합류: ${dest.name} 에 병력 (보${m.troops.INF} 궁${m.troops.ARC} 기${m.troops.CAV})`);
+    movements.splice(idx,1);
+    return true;
+  }else{
+    openBattle({attFrom:m.from, attOwner:m.owner, toId:m.to, att:m.troops});
+    movements.splice(idx,1);
+    return true;
+  }
+}
+function resolveMovementsStepwise(){
+  for(let i=0;i<movements.length;i++){ movements[i].turnsLeft--; }
+  while(true){
+    const progressed=resolveMovementsOrOpenBattles();
+    if(!progressed) break;
+    if(battleState) break;
+  }
+}
+
+/* ===== AI (간단) ===== */
+function aiPhase(){
+  const aiCities=cities.filter(c=>c.owner===ENEMY && sumTroops(c.troops)>=12);
+  for(const from of aiCities){
+    const targets=from.adj.map(id=>byId(id)).filter(t=>t.owner!==ENEMY);
+    if(targets.length===0) continue;
+    targets.sort((a,b)=>(sumTroops(a.troops)+a.defense*2)-(sumTroops(b.troops)+b.defense*2));
+    const to=targets[0];
+    const send=cloneTroops({
+      INF: Math.floor(from.troops.INF/2),
+      ARC: Math.floor(from.troops.ARC/2),
+      CAV: Math.floor(from.troops.CAV/2),
+    });
+    if(sumTroops(send)>0){
+      subTroops(from.troops, send);
+      movements.push({from:from.id,to:to.id,owner:ENEMY,troops:send,turnsLeft:1});
+      log(`(AI) 행군: ${from.name} → ${to.name} (보${send.INF} 궁${send.ARC} 기${send.CAV})`);
     }
+  }
+}
 
-    function nextTurn() {
-      turn++;
-      turnCounter.textContent = `현재 턴: ${turn}`;
+/* ===== 턴 종료 ===== */
+function endTurn(){
+  gold+=incomeOf(PLAYER); // 수입
+  resolveMovementsStepwise(); if(battleState){ updateTop(); draw(); refreshInfo(); return; }
+  aiPhase();
+  resolveMovementsStepwise(); if(battleState){ updateTop(); draw(); refreshInfo(); return; }
+  turn++; updateTop(); draw(); refreshInfo();
+}
 
-      for (let i = movements.length - 1; i >= 0; i--) {
-        const move = movements[i];
-        move.turnsLeft--;
-        if (move.turnsLeft <= 0) {
-          const destination = nodes[move.to];
-          if (destination.owner === move.owner) {
-            destination.troops += move.troops;
-          } else {
-            destination.troops -= move.troops;
-            if (destination.troops < 0) {
-              destination.owner = move.owner;
-              destination.troops = Math.abs(destination.troops);
-            }
-          }
-          movements.splice(i, 1);
-        }
-      }
-
-      runAITurn();
-
-      // 수익 계산
-      let income = 0;
-      for (const key in nodes) {
-        if (nodes[key].owner === "player") {
-          income += nodes[key].income;
-        }
-      }
-      resources += income;
-      resourceDisplay.textContent = `자원: ${resources} G`;
-
-      info.textContent = "턴이 진행되었습니다.";
-      drawMap();
-    }
-
-    function drawMap() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      for (const key in nodes) {
-        const node = nodes[key];
-        node.connections.forEach(conn => {
-          const target = nodes[conn];
-          ctx.strokeStyle = "#555";
-          ctx.beginPath();
-          ctx.moveTo(node.x, node.y);
-          ctx.lineTo(target.x, target.y);
-          ctx.stroke();
-        });
-      }
-
-      movements.forEach(move => {
-        const from = nodes[move.from];
-        const to = nodes[move.to];
-        ctx.strokeStyle = "#fff";
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        ctx.moveTo(from.x, from.y);
-        ctx.lineTo(to.x, to.y);
-        ctx.stroke();
-        ctx.setLineDash([]);
-      });
-
-      for (const key in nodes) {
-        const node = nodes[key];
-        ctx.beginPath();
-        ctx.arc(node.x, node.y, 20, 0, 2 * Math.PI);
-        ctx.fillStyle =
-          node.owner === "player" ? "#4CAF50" :
-          node.owner === "enemy" ? "#F44336" :
-          "#9E9E9E";
-        ctx.fill();
-        ctx.strokeStyle = "#000";
-        ctx.stroke();
-
-        if (key === hoveredNode) {
-          ctx.strokeStyle = "#FFFF00";
-          ctx.lineWidth = 2;
-          ctx.stroke();
-          ctx.lineWidth = 1;
-        }
-
-        ctx.fillStyle = "#fff";
-        ctx.font = "12px Arial";
-        ctx.fillText(`${node.name} (${node.troops})`, node.x - 20, node.y - 30);
-      }
-    }
-
-    let hoveredNode = null;
-    drawMap();
-  </script>
+/* ===== 초기화 ===== */
+function bootstrap(){ updateTop(); refreshInfo(); draw(); log("게임 시작. 플레이어의 턴입니다."); }
+bootstrap();
+</script>
 </body>
 </html>
