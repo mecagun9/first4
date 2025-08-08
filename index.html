@@ -27,33 +27,36 @@
     user-select: none;
   }
 
-  /* 모바일 우선 레이아웃 */
+  /* 아이폰 SE3 (375x667px, 16:9) 최적화 */
   #wrap{
     display:flex;
     flex-direction:column;
-    min-height:100vh;
+    height:100vh;
+    width:100vw;
+    position:fixed;
+    top:0;
+    left:0;
   }
 
-  /* 상단 고정 정보바 - 아이폰 SE3 최적화 */
+  /* 상단 고정 정보바 - 아이폰 SE3 1334x750 최적화 */
   #topBar{
     position:sticky;
     top:0;
     z-index:100;
     background:#0a0f16;
     border-bottom:1px solid #2a2e38;
-    padding:4px var(--gap);
+    padding:6px var(--gap);
     display:grid;
     grid-template-columns:1fr 1fr 1fr auto;
-    gap:4px;
+    gap:6px;
     align-items:center;
-    min-height:44px;
+    min-height:48px;
   }
 
-  /* 맵 영역 - 아이폰 SE3 최적화 */
+  /* 맵 영역 - 아이폰 SE3 1334x750 최적화 */
   #mapContainer{
-    flex:1;
+    flex:0 0 65vh; /* 1334x750 해상도에서 적절한 비율 */
     position:relative;
-    height:50vh; /* 아이폰 SE3는 세로가 짧으므로 고정 높이 */
     background:#0f1115;
     border-bottom:1px solid #2a2e38;
     overflow:auto;
@@ -102,34 +105,35 @@
     transition:all 0.1s ease;
   }
 
-  /* 하단 컨트롤 패널 - 아이폰 SE3 최적화 */
+  /* 하단 컨트롤 패널 - 16:9 비율 최적화 */
   #controls{
+    flex:1;
     background:#141a22;
     border-top:1px solid #2a2e38;
     padding:var(--gap);
-    max-height:50vh; /* 남은 공간 활용 */
     overflow-y:auto;
+    min-height:0; /* 플렉스 아이템 축소 허용 */
   }
 
-  /* 탭 시스템 - 아이폰 SE3 최적화 */
+  /* 탭 시스템 - 아이폰 SE3 1334x750 최적화 */
   .tabs{
     display:grid;
     grid-template-columns:1fr 1fr 1fr;
     margin-bottom:var(--gap);
-    border-radius:6px;
+    border-radius:8px;
     background:#0a0f16;
     overflow:hidden;
   }
   .tab{
-    padding:8px 4px;
+    padding:10px 6px;
     background:#1a2332;
     border:none;
     color:#ccc;
-    font-size:var(--font-sm);
+    font-size:var(--font-md);
     cursor:pointer;
     border-right:1px solid #2a2e38;
     text-align:center;
-    min-height:36px;
+    min-height:42px;
     display:flex;
     align-items:center;
     justify-content:center;
@@ -142,22 +146,22 @@
   .panel{
     background:#1a2332;
     border:1px solid #2a2e38;
-    border-radius:6px;
-    padding:8px;
+    border-radius:8px;
+    padding:10px;
     margin-bottom:var(--gap);
   }
   
   h3{
-    margin:0 0 6px 0;
-    font-size:var(--font-md);
+    margin:0 0 8px 0;
+    font-size:var(--font-lg);
     color:#8bd0ff;
   }
 
   .row{
     display:grid;
     grid-template-columns:1fr 1fr;
-    gap:6px;
-    margin-bottom:6px;
+    gap:8px;
+    margin-bottom:8px;
   }
   .row.triple{
     grid-template-columns:1fr 1fr 1fr;
@@ -168,13 +172,13 @@
   
   button{
     min-height:var(--tap);
-    min-width:60px;
-    padding:8px 12px;
-    border-radius:6px;
+    min-width:70px;
+    padding:10px 14px;
+    border-radius:8px;
     border:1px solid #445169;
     background:#223048;
     color:#fff;
-    font-size:var(--font-sm);
+    font-size:var(--font-md);
     cursor:pointer;
     white-space:nowrap;
     text-align:center;
@@ -182,37 +186,37 @@
   button:disabled{opacity:.5;cursor:not-allowed}
   .ghost{background:#1b2433;border-style:dashed}
   .full{grid-column:1/-1}
-  .compact{min-width:auto;padding:6px 10px;font-size:var(--font-xs)}
+  .compact{min-width:auto;padding:8px 12px;font-size:var(--font-sm)}
 
-  label, .kv{font-size:var(--font-sm);line-height:1.3}
+  label, .kv{font-size:var(--font-md);line-height:1.4}
   input[type="number"]{
-    width:60px;
-    height:36px;
-    font-size:var(--font-sm);
-    padding:0 6px;
-    border-radius:4px;
+    width:70px;
+    height:40px;
+    font-size:var(--font-md);
+    padding:0 8px;
+    border-radius:6px;
     border:1px solid #2a2e38;
     background:#0f1115;
     color:#fff;
   }
   input[type="checkbox"]{
-    width:18px;
-    height:18px;
-    transform:translateY(1px);
+    width:20px;
+    height:20px;
+    transform:translateY(2px);
     accent-color:#5aaeff;
   }
   
-  .muted{opacity:.75;font-size:var(--font-xs)}
+  .muted{opacity:.75;font-size:var(--font-sm)}
   
   .chip{
     display:inline-block;
-    min-height:28px;
-    border-radius:14px;
-    padding:4px 8px;
+    min-height:32px;
+    border-radius:16px;
+    padding:6px 10px;
     border:1px solid #2a2e38;
     background:#10161f;
-    font-size:var(--font-xs);
-    margin:1px 2px 1px 0;
+    font-size:var(--font-sm);
+    margin:2px 3px 2px 0;
     white-space:nowrap;
     text-align:center;
     display:flex;
@@ -298,34 +302,36 @@
     margin-bottom:3px;
   }
 
-  /* 반응형 조정 - 아이폰 SE3 기준 */
-  @media (max-width:375px){
-    :root{--tap:44px;--font-lg:14px;--font-md:12px;--font-sm:10px;--font-xs:9px;--gap:6px}
-    #topBar{padding:2px var(--gap);min-height:40px;grid-template-columns:repeat(4,1fr)}
-    .chip{padding:2px 6px;min-height:24px;font-size:9px}
-    button{padding:6px 8px;font-size:10px;min-height:40px}
-    .panel{padding:6px}
-    h3{font-size:12px}
-    input[type="number"]{width:50px;height:32px;font-size:10px}
-    #log{height:100px;font-size:9px}
-    .tab{padding:6px 2px;min-height:32px;font-size:10px}
+  /* 반응형 조정 - 아이폰 SE3 (1334x750 해상도) 기준 */
+  @media (max-width:375px) and (max-height:667px){
+    /* 아이폰 SE3 정확한 CSS 픽셀 크기 */
+    :root{--tap:44px;--font-lg:16px;--font-md:14px;--font-sm:12px;--font-xs:11px;--gap:8px}
+    #mapContainer{flex:0 0 62vh}
   }
-  @media (min-width:376px) and (max-width:414px){
-    :root{--tap:48px;--font-lg:15px;--font-md:13px;--font-sm:11px;--font-xs:10px}
+  @media (max-width:414px){
+    :root{--tap:46px;--font-lg:17px;--font-md:15px;--font-sm:13px;--font-xs:12px}
+    #mapContainer{flex:0 0 64vh}
   }
   @media (min-width:415px) and (max-width:768px){
-    :root{--tap:52px;--font-lg:16px;--font-md:14px;--font-sm:12px}
-    #mapContainer{height:55vh}
+    :root{--tap:48px;--font-lg:18px;--font-md:16px;--font-sm:14px}
+    #mapContainer{flex:0 0 66vh}
   }
   @media (min-width:768px){
-    :root{--tap:48px;--font-lg:18px;--font-md:16px}
-    #wrap{flex-direction:row}
-    #mapContainer{flex:2;height:70vh;border-bottom:none;border-right:1px solid #2a2e38}
-    #controls{flex:1;max-width:400px;border-top:none;border-left:1px solid #2a2e38;max-height:none}
+    :root{--tap:48px;--font-lg:20px;--font-md:18px}
+    #wrap{flex-direction:row;height:100vh}
+    #mapContainer{flex:2;border-bottom:none;border-right:1px solid #2a2e38}
+    #controls{flex:1;max-width:400px;border-top:none;border-left:1px solid #2a2e38}
     #selectedInfo{position:static;transform:none;max-width:none;margin-bottom:var(--gap)}
     .row{display:flex;gap:8px}
     .row.triple{display:flex}
     .row.single{display:flex}
+  }
+  
+  /* 아이폰 SE3 특별 최적화 */
+  @media screen and (device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2){
+    #mapContainer{flex:0 0 60vh} /* SE3 전용 */
+    .chip{font-size:11px;padding:5px 8px}
+    button{min-height:42px}
   })}
     .chip{padding:6px 10px;min-height:32px;font-size:11px}
     button{padding:10px 14px;font-size:var(--font-sm)}
@@ -511,14 +517,14 @@ function initTabs() {
   });
 }
 
-/* ===== 맵 스크롤링 시스템 ===== */
+/* ===== 맵 스크롤링 시스템 (1334x750 최적화) ===== */
 let mapScale = 1;
 let mapOffsetX = 0;
 let mapOffsetY = 0;
-let canvasWidth = 1200;  // 기본 맵 크기 (스크롤 가능한 전체 영역)
-let canvasHeight = 800;
-let viewportWidth = 400;
-let viewportHeight = 400;
+let canvasWidth = 1000;   // 아이폰 SE3 1334x750에 맞춘 크기
+let canvasHeight = 700;
+let viewportWidth = 375;  // CSS 픽셀 기준
+let viewportHeight = 450;
 
 function initMapDimensions() {
   const container = document.getElementById('mapContainer');
@@ -532,19 +538,27 @@ function initMapDimensions() {
   // 디바이스 픽셀 비율
   const dpr = window.devicePixelRatio || 1;
   
-  // 모바일 해상도에 따른 맵 스케일 조정
-  if (window.innerWidth <= 480) {
-    mapScale = 0.8;
+  // 아이폰 SE3 1334x750 해상도 기준 최적화
+  const screenWidth = window.screen.width;
+  const screenHeight = window.screen.height;
+  
+  if (screenWidth <= 375 || (screenWidth <= 750 && screenHeight <= 1334)) {
+    // 아이폰 SE3 또는 유사한 해상도
+    mapScale = 1;
     canvasWidth = 1000;
     canvasHeight = 700;
-  } else if (window.innerWidth <= 768) {
-    mapScale = 0.9;
+  } else if (screenWidth <= 414) {
+    mapScale = 1.1;
     canvasWidth = 1100;
     canvasHeight = 750;
-  } else {
-    mapScale = 1;
+  } else if (screenWidth <= 768) {
+    mapScale = 1.2;
     canvasWidth = 1200;
     canvasHeight = 800;
+  } else {
+    mapScale = 1.3;
+    canvasWidth = 1300;
+    canvasHeight = 900;
   }
   
   // 캔버스 실제 크기 설정
@@ -563,7 +577,7 @@ function initMapDimensions() {
   ctx.setTransform(dpr * mapScale, 0, 0, dpr * mapScale, 0, 0);
   
   // 초기 중앙 정렬
-  centerMapOnPlayer();
+  setTimeout(() => centerMapOnPlayer(), 100);
 }
 
 function centerMapOnPlayer() {
@@ -575,8 +589,11 @@ function centerMapOnPlayer() {
     
     // 뷰포트 중앙으로 스크롤
     const container = document.getElementById('mapContainer');
-    container.scrollLeft = Math.max(0, (centerX * mapScale) - (viewportWidth / 2));
-    container.scrollTop = Math.max(0, (centerY * mapScale) - (viewportHeight / 2));
+    const targetScrollLeft = Math.max(0, (centerX * mapScale) - (viewportWidth / 2));
+    const targetScrollTop = Math.max(0, (centerY * mapScale) - (viewportHeight / 2));
+    
+    container.scrollLeft = targetScrollLeft;
+    container.scrollTop = targetScrollTop;
   }
 }
 
@@ -708,14 +725,21 @@ function refreshInfo(){
   }
 }
 
-/* ===== 캔버스 렌더링 (스크롤링 대응) ===== */
+/* ===== 캔버스 렌더링 (터치 범위 시각화 포함) ===== */
 const canvas=document.getElementById("map");
 const ctx=canvas.getContext("2d");
 const NODE_R=28;
-const HIT_R2=(NODE_R+8)*(NODE_R+8);
+const HIT_R=NODE_R+12; // 터치 범위를 노드보다 12px 크게
+const HIT_R2=HIT_R*HIT_R;
+
+let showDebugCircles = false; // 디버그 모드
 
 function draw(){
-  ctx.clearRect(0, 0, canvas.width / (window.devicePixelRatio || 1) / mapScale, canvas.height / (window.devicePixelRatio || 1) / mapScale);
+  const canvasRect = canvas.getBoundingClientRect();
+  const clearWidth = canvas.width / (window.devicePixelRatio || 1) / mapScale;
+  const clearHeight = canvas.height / (window.devicePixelRatio || 1) / mapScale;
+  
+  ctx.clearRect(0, 0, clearWidth, clearHeight);
   
   // 연결선
   ctx.lineWidth=2;
@@ -743,8 +767,20 @@ function draw(){
     ctx.setLineDash([]);
   });
   
-  // 노드
+  // 노드 및 터치 범위
   cities.forEach(c=>{
+    // 디버그: 터치 범위 표시 (반투명 원)
+    if(showDebugCircles){
+      ctx.beginPath();
+      ctx.arc(c.x,c.y,HIT_R,0,Math.PI*2);
+      ctx.fillStyle="rgba(255,255,0,0.2)";
+      ctx.fill();
+      ctx.strokeStyle="rgba(255,255,0,0.5)";
+      ctx.lineWidth=1;
+      ctx.stroke();
+    }
+    
+    // 실제 도시 노드
     ctx.beginPath();
     ctx.arc(c.x,c.y,NODE_R,0,Math.PI*2);
     ctx.fillStyle=c.owner===PLAYER?"#2fb36b":c.owner===ENEMY?"#d94a4a":"#6e7a89";
@@ -753,6 +789,7 @@ function draw(){
     ctx.strokeStyle="#0b0e12";
     ctx.stroke();
     
+    // 선택 표시
     if(c.id===selectedId){
       ctx.beginPath();
       ctx.arc(c.x,c.y,NODE_R+6,0,Math.PI*2);
@@ -788,13 +825,27 @@ function draw(){
 }
 
 function cityAt(x,y){
-  return cities.find(c=>{
-    const dx=x-c.x,dy=y-c.y;
-    return dx*dx+dy*dy<=HIT_R2;
-  })?.id||null;
+  const found = cities.find(c=>{
+    const dx=x-c.x;
+    const dy=y-c.y;
+    const distance = dx*dx+dy*dy;
+    return distance <= HIT_R2;
+  });
+  
+  // 디버그 로그
+  if(showDebugCircles) {
+    console.log(`터치 좌표: (${x.toFixed(1)}, ${y.toFixed(1)})`);
+    if(found) {
+      console.log(`발견된 도시: ${found.name} (${found.x}, ${found.y})`);
+    } else {
+      console.log('도시를 찾을 수 없음');
+    }
+  }
+  
+  return found?.id||null;
 }
 
-/* ===== 터치/클릭 핸들링 (스크롤링 대응) ===== */
+/* ===== 터치/클릭 핸들링 (개선된 좌표 변환) ===== */
 function pickCityFromEvent(e){
   const container = document.getElementById('mapContainer');
   const canvas = document.getElementById('map');
@@ -807,67 +858,127 @@ function pickCityFromEvent(e){
   const scrollLeft = container.scrollLeft;
   const scrollTop = container.scrollTop;
   
-  // 캔버스 좌표로 변환
-  const x = ((clientX - rect.left + scrollLeft) / mapScale);
-  const y = ((clientY - rect.top + scrollTop) / mapScale);
+  // 캔버스 좌표로 변환 (정확한 스케일 적용)
+  const canvasX = (clientX - rect.left + scrollLeft) / mapScale;
+  const canvasY = (clientY - rect.top + scrollTop) / mapScale;
 
-  return cityAt(x, y);
+  // 디버그 로그
+  if(showDebugCircles) {
+    console.log('=== 터치 디버그 ===');
+    console.log(`클라이언트 좌표: (${clientX}, ${clientY})`);
+    console.log(`캔버스 rect: left=${rect.left}, top=${rect.top}`);
+    console.log(`스크롤: left=${scrollLeft}, top=${scrollTop}`);
+    console.log(`맵 스케일: ${mapScale}`);
+    console.log(`최종 캔버스 좌표: (${canvasX.toFixed(1)}, ${canvasY.toFixed(1)})`);
+  }
+
+  return cityAt(canvasX, canvasY);
 }
 
-// 터치 드래그와 탭 구분을 위한 변수들
-let touchStartX = 0;
-let touchStartY = 0;
-let touchMoved = false;
-let touchStartTime = 0;
+// 터치 상태 추적
+let touchState = {
+  startX: 0,
+  startY: 0,
+  moved: false,
+  startTime: 0,
+  isScrolling: false
+};
 
+// 마우스 클릭 (데스크톱)
 canvas.addEventListener("click",(e)=>{
-  const hit=pickCityFromEvent(e);
-  if(!hit) return;
-  handleCitySelect(hit);
+  e.preventDefault();
+  e.stopPropagation();
+  
+  const hit = pickCityFromEvent(e);
+  if(hit) {
+    console.log(`마우스 클릭으로 ${hit} 선택됨`);
+    handleCitySelect(hit);
+  } else if(showDebugCircles) {
+    console.log('마우스 클릭했지만 도시를 찾을 수 없음');
+  }
 });
 
+// 터치 시작
 canvas.addEventListener("touchstart",(e)=>{
-  e.preventDefault();
-  
-  touchStartX = e.touches[0].clientX;
-  touchStartY = e.touches[0].clientY;
-  touchStartTime = Date.now();
-  touchMoved = false;
-},{passive:false});
+  const touch = e.touches[0];
+  touchState.startX = touch.clientX;
+  touchState.startY = touch.clientY;
+  touchState.startTime = Date.now();
+  touchState.moved = false;
+  touchState.isScrolling = false;
+},{passive: true});
 
+// 터치 이동
 canvas.addEventListener("touchmove",(e)=>{
-  e.preventDefault();
+  if (e.touches.length !== 1) return;
   
-  const moveX = Math.abs(e.touches[0].clientX - touchStartX);
-  const moveY = Math.abs(e.touches[0].clientY - touchStartY);
+  const touch = e.touches[0];
+  const moveX = Math.abs(touch.clientX - touchState.startX);
+  const moveY = Math.abs(touch.clientY - touchState.startY);
   
-  if (moveX > 10 || moveY > 10) {
-    touchMoved = true;
+  // 15px 이상 움직이면 스크롤로 판단
+  if (moveX > 15 || moveY > 15) {
+    touchState.moved = true;
+    touchState.isScrolling = true;
   }
-},{passive:false});
+},{passive: true});
 
+// 터치 종료
 canvas.addEventListener("touchend",(e)=>{
   e.preventDefault();
+  e.stopPropagation();
   
-  const touchDuration = Date.now() - touchStartTime;
+  const touchDuration = Date.now() - touchState.startTime;
   
-  // 짧은 시간 동안 움직임이 적으면 탭으로 처리
-  if (!touchMoved && touchDuration < 300) {
-    // 터치 종료 시점의 좌표를 사용
+  // 600ms 이내의 짧은 터치이고 움직임이 적으면 탭으로 처리
+  if (!touchState.moved && touchDuration < 600 && !touchState.isScrolling) {
     const touch = e.changedTouches[0];
+    
+    // 터치 좌표를 사용하여 도시 선택
     const fakeEvent = {
-      touches: [touch],
-      clientX: touch.clientX,
-      clientY: touch.clientY
+      touches: [{
+        clientX: touch.clientX,
+        clientY: touch.clientY
+      }]
     };
     
     const hit = pickCityFromEvent(fakeEvent);
     if (hit) {
       vibrate([30]);
+      console.log(`터치로 ${hit} 선택됨`);
       handleCitySelect(hit);
+    } else if(showDebugCircles) {
+      console.log('터치했지만 도시를 찾을 수 없음');
     }
+  } else if(showDebugCircles) {
+    console.log(`터치 무시됨: moved=${touchState.moved}, duration=${touchDuration}ms, scrolling=${touchState.isScrolling}`);
   }
-},{passive:false});
+  
+  // 상태 초기화
+  touchState.moved = false;
+  touchState.isScrolling = false;
+},{passive: false});
+
+// 디버그 모드 토글 함수 (콘솔에서 사용 가능)
+function toggleDebug() {
+  showDebugCircles = !showDebugCircles;
+  console.log(`디버그 모드: ${showDebugCircles ? 'ON' : 'OFF'}`);
+  draw();
+}
+
+// 콘솔에 도움말 출력
+console.log('🎮 터치 디버깅 도구:');
+console.log('- toggleDebug(): 터치 범위 시각화 토글');
+console.log('- 노란색 원이 실제 터치 가능 범위입니다');
+
+// 더블탭 방지
+canvas.addEventListener("touchstart", function(e) {
+  e.preventDefault();
+}, {passive: false});
+
+canvas.addEventListener("touchmove", function(e) {
+  e.preventDefault();
+}, {passive: false});
 
 function handleCitySelect(hit){
   selectedId=hit;
